@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>face-rppg-web</title>
+        <link rel="stylesheet" href="css/style.css" />
+    </head>
+
+    <body>
+        <div id="app">
+            <header>
+                <h1>Face rPPG Web PoC</h1>
+                <p>顔から脈波（rPPG）を推定</p>
+            </header>
+
+            <section id="camera-section">
+                <div class="video-container">
+                    <video id="video" autoplay playsinline muted></video>
+                    <canvas id="overlay"></canvas>
+                </div>
+            </section>
+
+            <section id="info-section">
+                <div class="info-block">
+                    <span class="label">BPM</span>
+                    <span id="bpm">--</span>
+                </div>
+
+                <div class="info-block">
+                    <span class="label">状態</span>
+                    <span id="status">初期化中...</span>
+                </div>
+
+                <div class="info-block">
+                    <span class="label">FPS</span>
+                    <span id="fps">--</span>
+                </div>
+            </section>
+
+            <section id="graph-section">
+                <canvas id="waveform"></canvas>
+            </section>
+        </div>
+
+        <script type="module" src="js/main.js"></script>
+    </body>
+
+</html>
