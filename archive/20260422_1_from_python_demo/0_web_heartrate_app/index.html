@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web Heart Rate Monitor</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <h1>Web Heart Rate Monitor</h1>
+          <p class="subtitle">ブラウザ上で顔検出・ROI 抽出・rPPG 推定を行うデモ</p>
+        </div>
+        <button id="startButton" class="primary-button">計測開始</button>
+      </header>
+
+      <section class="status-grid">
+        <article class="status-card">
+          <h2>BPM</h2>
+          <p id="bpmValue" class="status-value">--</p>
+          <p class="status-note">推定心拍数</p>
+        </article>
+        <article class="status-card">
+          <h2>Quality</h2>
+          <p id="qualityValue" class="status-value">--</p>
+          <p class="status-note">ピーク強度 / スペクトル中央値</p>
+        </article>
+        <article class="status-card">
+          <h2>FPS</h2>
+          <p id="fpsValue" class="status-value">--</p>
+          <p class="status-note">描画更新レート</p>
+        </article>
+        <article class="status-card">
+          <h2>Status</h2>
+          <p id="statusValue" class="status-value small">待機中</p>
+          <p class="status-note">顔検出・信号処理の状態</p>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel video-panel">
+          <div class="panel-header">
+            <h2>Camera</h2>
+          </div>
+          <div class="video-stage">
+            <video id="video" playsinline muted></video>
+            <canvas id="overlay"></canvas>
+          </div>
+          <p class="panel-note">
+            顔全体と、額・左右頬の ROI を重ね描画します。
+          </p>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="panel-header">
+            <h2>RGB Mean</h2>
+          </div>
+          <canvas id="rgbChart"></canvas>
+        </article>
+
+        <article class="panel chart-panel wide">
+          <div class="panel-header">
+            <h2>rPPG / Filtered Signal</h2>
+          </div>
+          <canvas id="rppgChart"></canvas>
+        </article>
+      </section>
+
+      <section class="panel settings-panel">
+        <div class="panel-header">
+          <h2>Parameters</h2>
+        </div>
+        <div class="settings-grid">
+          <label>
+            Window (sec)
+            <input id="windowSecInput" type="number" min="5" max="20" step="1" value="10" />
+          </label>
+          <label>
+            Min BPM
+            <input id="minBpmInput" type="number" min="30" max="120" step="1" value="45" />
+          </label>
+          <label>
+            Max BPM
+            <input id="maxBpmInput" type="number" min="90" max="220" step="1" value="180" />
+          </label>
+          <label>
+            BPM Update Interval (sec)
+            <input id="bpmIntervalInput" type="number" min="0.5" max="3.0" step="0.1" value="1.0" />
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
