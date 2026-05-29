@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Face rPPG</title>
+    <title>Web Heart Rate Monitor</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -13,7 +13,7 @@
     <main class="app-shell">
       <header class="app-header">
         <div class="header-copy">
-          <h1>Face rPPG</h1>
+          <h1>Web Heart Rate Monitor</h1>
         </div>
         <button id="startButton" class="primary-button">計測開始</button>
       </header>
@@ -39,11 +39,6 @@
           <p id="statusValue" class="status-value small">待機中</p>
           <p class="status-note">顔検出・信号処理の状態</p>
         </article>
-        <article class="status-card">
-          <h2>Resolution</h2>
-          <p id="resolutionValue" class="status-value small">--</p>
-          <p class="status-note">カメラ入力サイズ</p>
-        </article>
       </section>
 
       <section class="content-grid">
@@ -57,26 +52,12 @@
               <canvas id="overlay"></canvas>
             </div>
           </div>
-          <p class="panel-note">顔全体と、額・左右頬・鼻横・あご周辺など複数 ROI を重ね描画します。</p>
+          <p class="panel-note">顔全体と、額・左右頬の ROI を重ね描画します。</p>
         </article>
 
         <article class="panel chart-panel">
-          <div class="panel-header chart-header">
+          <div class="panel-header">
             <h2>RGB Mean</h2>
-            <div class="series-controls" aria-label="RGB Mean series visibility">
-              <label class="series-toggle series-toggle-r">
-                <input id="showRgbR" type="checkbox" checked />
-                R
-              </label>
-              <label class="series-toggle series-toggle-g">
-                <input id="showRgbG" type="checkbox" checked />
-                G
-              </label>
-              <label class="series-toggle series-toggle-b">
-                <input id="showRgbB" type="checkbox" checked />
-                B
-              </label>
-            </div>
           </div>
           <div class="chart-wrap compact">
             <canvas id="rgbChart"></canvas>
@@ -84,18 +65,8 @@
         </article>
 
         <article class="panel chart-panel wide">
-          <div class="panel-header chart-header">
-            <h2>rPPG Pulse Wave</h2>
-            <div class="series-controls" aria-label="rPPG Pulse Wave series visibility">
-              <label class="series-toggle series-toggle-raw">
-                <input id="showRppgRaw" type="checkbox" checked />
-                Raw
-              </label>
-              <label class="series-toggle series-toggle-pulse">
-                <input id="showRppgFiltered" type="checkbox" checked />
-                Pulse
-              </label>
-            </div>
+          <div class="panel-header">
+            <h2>rPPG / Filtered Signal</h2>
           </div>
           <div class="chart-wrap">
             <canvas id="rppgChart"></canvas>

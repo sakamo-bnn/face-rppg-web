@@ -16,12 +16,6 @@ const minBpmInput = document.getElementById("minBpmInput");
 const maxBpmInput = document.getElementById("maxBpmInput");
 const bpmIntervalInput = document.getElementById("bpmIntervalInput");
 
-const showRgbR = document.getElementById("showRgbR");
-const showRgbG = document.getElementById("showRgbG");
-const showRgbB = document.getElementById("showRgbB");
-const showRppgRaw = document.getElementById("showRppgRaw");
-const showRppgFiltered = document.getElementById("showRppgFiltered");
-
 const appState = {
   detector: null,
   stream: null,
@@ -45,8 +39,6 @@ const DETECTION_INTERVAL_MS = 100;
 const FACE_BOX_TTL_MS = 1000;
 const QUALITY_THRESHOLD = 2.2;
 const MAX_RGB_HISTORY = 300;
-const RPPG_DISPLAY_SEC = 10;
-const RPPG_DISPLAY_SAMPLES = DEFAULT_RESAMPLE_FS * RPPG_DISPLAY_SEC;
 
 const rgbChart = createChart("rgbChart", [
   { label: "R", borderColor: "#ef4444" },
@@ -58,8 +50,6 @@ const rppgChart = createChart("rppgChart", [
   { label: "Raw rPPG", borderColor: "#94a3b8" },
   { label: "Pulse-like Bandpass", borderColor: "#06b6d4" },
 ]);
-
-setupSeriesVisibilityControls();
 
 startButton.addEventListener("click", async () => {
   if (appState.running) {
@@ -634,52 +624,15 @@ function updateRgbChart() {
   rgbChart.data.datasets[0].data = samples.map((s) => s.r);
   rgbChart.data.datasets[1].data = samples.map((s) => s.g);
   rgbChart.data.datasets[2].data = samples.map((s) => s.b);
-  applySeriesVisibility();
   rgbChart.update("none");
 }
 
 function updateRppgChart(raw, filtered) {
-  const displayLen = getRppgDisplaySamples();
-  rppgChart.data.labels = Array.from({ length: displayLen }, (_, i) => i + 1);
-  rppgChart.data.datasets[0].data = toFixedFlowSeries(raw, displayLen);
-  rppgChart.data.datasets[1].data = toFixedFlowSeries(filtered, displayLen);
-  applySeriesVisibility();
+  const len = Math.max(raw.length, filtered.length);
+  rppgChart.data.labels = Array.from({ length: len }, (_, i) => i + 1);
+  rppgChart.data.datasets[0].data = raw;
+  rppgChart.data.datasets[1].data = filtered;
   rppgChart.update("none");
-}
-
-function toFixedFlowSeries(values, displayLen) {
-  const out = new Array(displayLen).fill(null);
-  const tail = values.slice(-displayLen);
-  const offset = displayLen - tail.length;
-  for (let i = 0; i < tail.length; i += 1) {
-    out[offset + i] = tail[i];
-  }
-  return out;
-}
-
-function getRppgDisplaySamples() {
-  return Math.max(64, Math.round(getWindowSec() * DEFAULT_RESAMPLE_FS), RPPG_DISPLAY_SAMPLES);
-}
-
-function setupSeriesVisibilityControls() {
-  [showRgbR, showRgbG, showRgbB, showRppgRaw, showRppgFiltered]
-    .filter(Boolean)
-    .forEach((checkbox) => {
-      checkbox.addEventListener("change", () => {
-        applySeriesVisibility();
-        rgbChart.update("none");
-        rppgChart.update("none");
-      });
-    });
-  applySeriesVisibility();
-}
-
-function applySeriesVisibility() {
-  rgbChart.data.datasets[0].hidden = showRgbR ? !showRgbR.checked : false;
-  rgbChart.data.datasets[1].hidden = showRgbG ? !showRgbG.checked : false;
-  rgbChart.data.datasets[2].hidden = showRgbB ? !showRgbB.checked : false;
-  rppgChart.data.datasets[0].hidden = showRppgRaw ? !showRppgRaw.checked : false;
-  rppgChart.data.datasets[1].hidden = showRppgFiltered ? !showRppgFiltered.checked : false;
 }
 
 function createChart(canvasId, datasets) {
@@ -701,7 +654,7 @@ function createChart(canvasId, datasets) {
       animation: false,
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: true } },
       scales: {
         x: { display: false },
         y: { ticks: { maxTicksLimit: 6 } },

@@ -9,18 +9,11 @@ const bpmValue = document.getElementById("bpmValue");
 const qualityValue = document.getElementById("qualityValue");
 const fpsValue = document.getElementById("fpsValue");
 const statusValue = document.getElementById("statusValue");
-const resolutionValue = document.getElementById("resolutionValue");
 
 const windowSecInput = document.getElementById("windowSecInput");
 const minBpmInput = document.getElementById("minBpmInput");
 const maxBpmInput = document.getElementById("maxBpmInput");
 const bpmIntervalInput = document.getElementById("bpmIntervalInput");
-
-const showRgbR = document.getElementById("showRgbR");
-const showRgbG = document.getElementById("showRgbG");
-const showRgbB = document.getElementById("showRgbB");
-const showRppgRaw = document.getElementById("showRppgRaw");
-const showRppgFiltered = document.getElementById("showRppgFiltered");
 
 const appState = {
   detector: null,
@@ -45,8 +38,6 @@ const DETECTION_INTERVAL_MS = 100;
 const FACE_BOX_TTL_MS = 1000;
 const QUALITY_THRESHOLD = 2.2;
 const MAX_RGB_HISTORY = 300;
-const RPPG_DISPLAY_SEC = 10;
-const RPPG_DISPLAY_SAMPLES = DEFAULT_RESAMPLE_FS * RPPG_DISPLAY_SEC;
 
 const rgbChart = createChart("rgbChart", [
   { label: "R", borderColor: "#ef4444" },
@@ -55,11 +46,9 @@ const rgbChart = createChart("rgbChart", [
 ]);
 
 const rppgChart = createChart("rppgChart", [
-  { label: "Raw rPPG", borderColor: "#94a3b8" },
-  { label: "Pulse-like Bandpass", borderColor: "#06b6d4" },
+  { label: "Raw", borderColor: "#94a3b8" },
+  { label: "Filtered", borderColor: "#06b6d4" },
 ]);
-
-setupSeriesVisibilityControls();
 
 startButton.addEventListener("click", async () => {
   if (appState.running) {
@@ -96,7 +85,6 @@ function resetStateForRun() {
   updatePulseLabels(null, null);
   updateRgbChart();
   updateRppgChart([], []);
-  updateResolutionLabel();
 }
 
 async function setupDetector() {
@@ -132,7 +120,6 @@ async function setupCamera() {
   video.srcObject = appState.stream;
   await video.play();
   syncCanvasSize();
-  updateResolutionLabel();
 }
 
 function stopApp() {
@@ -147,13 +134,11 @@ function stopApp() {
 
   video.srcObject = null;
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
-  updateResolutionLabel();
 }
 
 function syncCanvasSize() {
   overlay.width = video.videoWidth || 640;
   overlay.height = video.videoHeight || 480;
-  updateResolutionLabel();
 
   if (!appState.offscreenCanvas) {
     appState.offscreenCanvas = document.createElement("canvas");
@@ -172,7 +157,6 @@ function processLoop(now) {
     if (overlay.width !== video.videoWidth || overlay.height !== video.videoHeight) {
       syncCanvasSize();
     }
-    updateResolutionLabel();
 
     let faceBox = appState.lastDetectionBox;
     let faceScore = appState.lastDetectionScore;
@@ -229,20 +213,11 @@ function pickBestFace(detections) {
 function getMultiRois(faceBox) {
   if (!faceBox) return [];
 
-  // Small ROIs are used instead of one large patch so that hair, eyes, mouth,
-  // and specular highlights affect the pulse estimate less.
-  const relBoxes = [
-    [0.30, 0.12, 0.70, 0.27], // forehead
-    [0.18, 0.30, 0.36, 0.48], // left temple / upper cheek
-    [0.64, 0.30, 0.82, 0.48], // right temple / upper cheek
-    [0.14, 0.48, 0.36, 0.68], // left cheek
-    [0.64, 0.48, 0.86, 0.68], // right cheek
-    [0.38, 0.46, 0.48, 0.66], // left side of nose
-    [0.52, 0.46, 0.62, 0.66], // right side of nose
-    [0.36, 0.72, 0.64, 0.84], // chin / lower face
-  ];
+  const foreheadRel = [0.28, 0.14, 0.72, 0.30];
+  const leftCheekRel = [0.12, 0.45, 0.34, 0.68];
+  const rightCheekRel = [0.66, 0.45, 0.88, 0.68];
 
-  return relBoxes
+  return [foreheadRel, leftCheekRel, rightCheekRel]
     .map((rel) => roiFromRelBox(faceBox, rel))
     .filter(Boolean);
 }
@@ -265,6 +240,9 @@ function roiFromRelBox(faceBox, rel) {
 
 function drawOverlay(faceBox, faceScore, roiBoxes) {
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+  overlayCtx.save();
+  overlayCtx.translate(overlay.width, 0);
+  overlayCtx.scale(-1, 1);
 
   if (faceBox) {
     overlayCtx.strokeStyle = "#22c55e";
@@ -279,11 +257,10 @@ function drawOverlay(faceBox, faceScore, roiBoxes) {
 
   overlayCtx.strokeStyle = "#ef4444";
   overlayCtx.lineWidth = 2;
-  roiBoxes.forEach((box, index) => {
+  roiBoxes.forEach((box) => {
     overlayCtx.strokeRect(box.x, box.y, box.width, box.height);
-    overlayCtx.fillStyle = "#ef4444";
-    overlayCtx.fillText(`${index + 1}`, box.x + 4, box.y + 14);
   });
+  overlayCtx.restore();
 }
 
 function extractMeanRgb(videoElement, roiBoxes) {
@@ -350,9 +327,9 @@ function updatePulseEstimation(nowSec) {
     return;
   }
 
-  const raw = normalize(detrend(resampled.x, Math.round(DEFAULT_RESAMPLE_FS * 1.5)));
-  let filtered = bandpassBiquad(raw, DEFAULT_RESAMPLE_FS, getMinBpm() / 60, getMaxBpm() / 60);
-  filtered = normalize(movingAverage(filtered, 7));
+  let raw = normalize(resampled.x);
+  let filtered = bandpassFft(raw, DEFAULT_RESAMPLE_FS, getMinBpm() / 60, getMaxBpm() / 60);
+  filtered = movingAverage(filtered, 5);
   updateRppgChart(raw, filtered);
 
   const intervalSec = getBpmInterval();
@@ -456,74 +433,6 @@ function estimateBpmFromFft(sig, fs, minBpm, maxBpm) {
   const amps = selected.map((s) => s.amp).sort((a, b) => a - b);
   const median = amps[Math.floor(amps.length / 2)] + 1e-8;
   return { bpm: peak.freq * 60, quality: peak.amp / median };
-}
-
-function detrend(arr, windowSize) {
-  if (arr.length === 0) return [];
-  const trend = movingAverage(arr, Math.max(3, windowSize | 1));
-  return arr.map((v, i) => v - trend[i]);
-}
-
-function bandpassBiquad(sig, fs, lowHz, highHz) {
-  if (!sig.length) return [];
-  const hp = biquadFilter(sig, makeHighpassCoeffs(lowHz, fs, 0.707));
-  const lp = biquadFilter(hp, makeLowpassCoeffs(highHz, fs, 0.707));
-  const reversed = biquadFilter([...lp].reverse(), makeHighpassCoeffs(lowHz, fs, 0.707));
-  return biquadFilter(reversed, makeLowpassCoeffs(highHz, fs, 0.707)).reverse();
-}
-
-function makeHighpassCoeffs(freq, fs, q) {
-  const w0 = (2 * Math.PI * freq) / fs;
-  const cosW0 = Math.cos(w0);
-  const alpha = Math.sin(w0) / (2 * q);
-  let b0 = (1 + cosW0) / 2;
-  let b1 = -(1 + cosW0);
-  let b2 = (1 + cosW0) / 2;
-  const a0 = 1 + alpha;
-  let a1 = -2 * cosW0;
-  let a2 = 1 - alpha;
-  return normalizeBiquad({ b0, b1, b2, a0, a1, a2 });
-}
-
-function makeLowpassCoeffs(freq, fs, q) {
-  const w0 = (2 * Math.PI * freq) / fs;
-  const cosW0 = Math.cos(w0);
-  const alpha = Math.sin(w0) / (2 * q);
-  let b0 = (1 - cosW0) / 2;
-  let b1 = 1 - cosW0;
-  let b2 = (1 - cosW0) / 2;
-  const a0 = 1 + alpha;
-  let a1 = -2 * cosW0;
-  let a2 = 1 - alpha;
-  return normalizeBiquad({ b0, b1, b2, a0, a1, a2 });
-}
-
-function normalizeBiquad(c) {
-  return {
-    b0: c.b0 / c.a0,
-    b1: c.b1 / c.a0,
-    b2: c.b2 / c.a0,
-    a1: c.a1 / c.a0,
-    a2: c.a2 / c.a0,
-  };
-}
-
-function biquadFilter(sig, c) {
-  const out = new Array(sig.length);
-  let x1 = 0;
-  let x2 = 0;
-  let y1 = 0;
-  let y2 = 0;
-  for (let i = 0; i < sig.length; i += 1) {
-    const x0 = sig[i];
-    const y0 = c.b0 * x0 + c.b1 * x1 + c.b2 * x2 - c.a1 * y1 - c.a2 * y2;
-    out[i] = y0;
-    x2 = x1;
-    x1 = x0;
-    y2 = y1;
-    y1 = y0;
-  }
-  return out;
 }
 
 function bandpassFft(sig, fs, lowHz, highHz) {
@@ -634,52 +543,15 @@ function updateRgbChart() {
   rgbChart.data.datasets[0].data = samples.map((s) => s.r);
   rgbChart.data.datasets[1].data = samples.map((s) => s.g);
   rgbChart.data.datasets[2].data = samples.map((s) => s.b);
-  applySeriesVisibility();
   rgbChart.update("none");
 }
 
 function updateRppgChart(raw, filtered) {
-  const displayLen = getRppgDisplaySamples();
-  rppgChart.data.labels = Array.from({ length: displayLen }, (_, i) => i + 1);
-  rppgChart.data.datasets[0].data = toFixedFlowSeries(raw, displayLen);
-  rppgChart.data.datasets[1].data = toFixedFlowSeries(filtered, displayLen);
-  applySeriesVisibility();
+  const len = Math.max(raw.length, filtered.length);
+  rppgChart.data.labels = Array.from({ length: len }, (_, i) => i + 1);
+  rppgChart.data.datasets[0].data = raw;
+  rppgChart.data.datasets[1].data = filtered;
   rppgChart.update("none");
-}
-
-function toFixedFlowSeries(values, displayLen) {
-  const out = new Array(displayLen).fill(null);
-  const tail = values.slice(-displayLen);
-  const offset = displayLen - tail.length;
-  for (let i = 0; i < tail.length; i += 1) {
-    out[offset + i] = tail[i];
-  }
-  return out;
-}
-
-function getRppgDisplaySamples() {
-  return Math.max(64, Math.round(getWindowSec() * DEFAULT_RESAMPLE_FS), RPPG_DISPLAY_SAMPLES);
-}
-
-function setupSeriesVisibilityControls() {
-  [showRgbR, showRgbG, showRgbB, showRppgRaw, showRppgFiltered]
-    .filter(Boolean)
-    .forEach((checkbox) => {
-      checkbox.addEventListener("change", () => {
-        applySeriesVisibility();
-        rgbChart.update("none");
-        rppgChart.update("none");
-      });
-    });
-  applySeriesVisibility();
-}
-
-function applySeriesVisibility() {
-  rgbChart.data.datasets[0].hidden = showRgbR ? !showRgbR.checked : false;
-  rgbChart.data.datasets[1].hidden = showRgbG ? !showRgbG.checked : false;
-  rgbChart.data.datasets[2].hidden = showRgbB ? !showRgbB.checked : false;
-  rppgChart.data.datasets[0].hidden = showRppgRaw ? !showRppgRaw.checked : false;
-  rppgChart.data.datasets[1].hidden = showRppgFiltered ? !showRppgFiltered.checked : false;
 }
 
 function createChart(canvasId, datasets) {
@@ -701,7 +573,7 @@ function createChart(canvasId, datasets) {
       animation: false,
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { display: true } },
       scales: {
         x: { display: false },
         y: { ticks: { maxTicksLimit: 6 } },
@@ -712,16 +584,6 @@ function createChart(canvasId, datasets) {
 
 function setStatus(text) {
   statusValue.textContent = text;
-}
-
-function updateResolutionLabel() {
-  if (!resolutionValue) return;
-  const width = video.videoWidth || overlay.width || 0;
-  const height = video.videoHeight || overlay.height || 0;
-  const track = appState.stream?.getVideoTracks?.()[0];
-  const settings = track?.getSettings?.() || {};
-  const fps = settings.frameRate ? ` / ${Math.round(settings.frameRate)}fps` : "";
-  resolutionValue.textContent = width && height ? `${width} x ${height}${fps}` : "--";
 }
 
 function getWindowSec() {
