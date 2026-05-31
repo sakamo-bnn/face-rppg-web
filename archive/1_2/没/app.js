@@ -76,10 +76,6 @@ const rppgChart = createChart("rppgChart", [
 
 setupSeriesVisibilityControls();
 setupCameraResolutionControl();
-updateViewportLayout();
-
-window.addEventListener("resize", updateViewportLayout);
-window.addEventListener("orientationchange", updateViewportLayout);
 
 startButton.addEventListener("click", async () => {
   if (appState.running) {
@@ -101,22 +97,6 @@ startButton.addEventListener("click", async () => {
     setStatus(`初期化失敗: ${error.message}`);
   }
 });
-
-function updateViewportLayout() {
-  const viewportWidth = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
-  const viewportHeight = Math.max(1, window.innerHeight || document.documentElement.clientHeight || 1);
-  const ratio = viewportWidth / viewportHeight;
-  const compact = viewportWidth < 980 || viewportHeight < 700;
-
-  document.documentElement.style.setProperty("--viewport-w", String(viewportWidth));
-  document.documentElement.style.setProperty("--viewport-h", String(viewportHeight));
-  document.documentElement.style.setProperty("--viewport-ratio", ratio.toFixed(4));
-  document.body.dataset.layout = compact ? (ratio >= 1 ? "compact-landscape" : "compact-portrait") : "desktop";
-
-  if (video.readyState >= 1) {
-    syncCanvasSize();
-  }
-}
 
 function resetStateForRun() {
   appState.fpsSmooth = null;
