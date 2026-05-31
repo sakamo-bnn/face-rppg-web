@@ -15,7 +15,6 @@ const windowSecInput = document.getElementById("windowSecInput");
 const minBpmInput = document.getElementById("minBpmInput");
 const maxBpmInput = document.getElementById("maxBpmInput");
 const bpmIntervalInput = document.getElementById("bpmIntervalInput");
-const cameraResolutionSelect = document.getElementById("cameraResolutionSelect");
 
 const showRgbR = document.getElementById("showRgbR");
 const showRgbG = document.getElementById("showRgbG");
@@ -40,10 +39,6 @@ const appState = {
   offscreenCanvas: null,
   offscreenCtx: null,
   cameraCapabilities: null,
-  rppgPlotRaw: [],
-  rppgPlotFiltered: [],
-  lastRppgPlotTime: null,
-  rppgYAxis: { min: -3, max: 3 },
 };
 
 const DEFAULT_RESAMPLE_FS = 30;
@@ -53,15 +48,6 @@ const QUALITY_THRESHOLD = 2.2;
 const MAX_RGB_HISTORY = 300;
 const RPPG_DISPLAY_SEC = 10;
 const RPPG_DISPLAY_SAMPLES = DEFAULT_RESAMPLE_FS * RPPG_DISPLAY_SEC;
-const CAMERA_RESOLUTION_PRESETS = [
-  { label: "3840 x 2160", width: 3840, height: 2160 },
-  { label: "2560 x 1440", width: 2560, height: 1440 },
-  { label: "1920 x 1080", width: 1920, height: 1080 },
-  { label: "1280 x 720", width: 1280, height: 720 },
-  { label: "960 x 540", width: 960, height: 540 },
-  { label: "640 x 480", width: 640, height: 480 },
-  { label: "640 x 360", width: 640, height: 360 },
-];
 
 const rgbChart = createChart("rgbChart", [
   { label: "R", borderColor: "#ef4444" },
@@ -75,7 +61,6 @@ const rppgChart = createChart("rppgChart", [
 ]);
 
 setupSeriesVisibilityControls();
-setupCameraResolutionControl();
 
 startButton.addEventListener("click", async () => {
   if (appState.running) {
@@ -109,10 +94,6 @@ function resetStateForRun() {
   appState.lastBpm = null;
   appState.lastQuality = 0;
   appState.samples = [];
-  appState.rppgPlotRaw = [];
-  appState.rppgPlotFiltered = [];
-  appState.lastRppgPlotTime = null;
-  appState.rppgYAxis = { min: -3, max: 3 };
   updatePulseLabels(null, null);
   updateRgbChart();
   updateRppgChart([], []);
@@ -139,82 +120,47 @@ async function setupDetector() {
 async function setupCamera() {
   if (appState.stream) return;
 
-  const initialConstraints = buildCameraConstraints(cameraResolutionSelect?.value || "max");
   appState.stream = await navigator.mediaDevices.getUserMedia({
-    video: initialConstraints,
+    video: {
+      facingMode: { ideal: "user" },
+      width: { ideal: 99999 },
+      height: { ideal: 99999 },
+      frameRate: { ideal: 30 },
+    },
     audio: false,
   });
 
-  video.srcObject = appState.stream;
-
   const track = appState.stream.getVideoTracks()[0];
-  appState.cameraCapabilities = track?.getCapabilities?.() || {};
-  populateCameraResolutionOptions();
-  await applySelectedCameraResolution();
+  await requestMaximumCameraResolution(track);
 
+  video.srcObject = appState.stream;
   await video.play();
   syncCanvasSize();
   updateResolutionLabel();
 }
 
-function buildCameraConstraints(resolutionValue = "max") {
-  const base = {
-    facingMode: { ideal: "user" },
-    frameRate: { ideal: 30 },
-  };
-
-  if (resolutionValue === "max") {
-    return {
-      ...base,
-      width: { ideal: 99999 },
-      height: { ideal: 99999 },
-    };
-  }
-
-  const parsed = parseResolutionValue(resolutionValue);
-  if (!parsed) return base;
-
-  return {
-    ...base,
-    width: { ideal: parsed.width },
-    height: { ideal: parsed.height },
-  };
-}
-
-async function applySelectedCameraResolution() {
-  const track = appState.stream?.getVideoTracks?.()[0];
+async function requestMaximumCameraResolution(track) {
   if (!track) return;
 
-  const constraints = buildCameraConstraints(cameraResolutionSelect?.value || "max");
-  const maxFrameRate = getCapabilityMax(appState.cameraCapabilities?.frameRate);
-  if (maxFrameRate) {
-    constraints.frameRate = { ideal: Math.min(30, maxFrameRate) };
-  }
+  const capabilities = track.getCapabilities?.() || {};
+  appState.cameraCapabilities = capabilities;
+
+  const maxWidth = getCapabilityMax(capabilities.width);
+  const maxHeight = getCapabilityMax(capabilities.height);
+  const maxFrameRate = getCapabilityMax(capabilities.frameRate);
+
+  if (!maxWidth && !maxHeight) return;
+
+  const constraints = {};
+  if (maxWidth) constraints.width = { ideal: maxWidth };
+  if (maxHeight) constraints.height = { ideal: maxHeight };
+  if (maxFrameRate) constraints.frameRate = { ideal: Math.min(30, maxFrameRate) };
 
   try {
     await track.applyConstraints(constraints);
-    await waitForVideoMetadata();
-    syncCanvasSize();
-    setStatus(appState.running ? "計測中" : "待機中");
   } catch (error) {
-    console.warn("Could not apply camera resolution constraints.", error);
-    setStatus(`解像度変更失敗: ${error.message}`);
-  } finally {
-    updateResolutionLabel();
+    console.warn("Could not apply maximum camera resolution constraints.", error);
   }
-}
-
-function parseResolutionValue(value) {
-  const match = String(value || "").match(/^(\d+)x(\d+)$/);
-  if (!match) return null;
-  return { width: Number(match[1]), height: Number(match[2]) };
-}
-
-function waitForVideoMetadata() {
-  if (video.readyState >= 1) return Promise.resolve();
-  return new Promise((resolve) => {
-    video.addEventListener("loadedmetadata", resolve, { once: true });
-  });
 }
 
 function getCapabilityMax(capability) {
@@ -235,7 +181,6 @@ function stopApp() {
   }
 
   appState.cameraCapabilities = null;
-  populateCameraResolutionOptions();
   video.srcObject = null;
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
   updateResolutionLabel();
@@ -299,6 +244,7 @@ function processLoop(now) {
     } else {
       setStatus("顔が見つかりません");
       updatePulseLabels(null, null);
+      updateRppgChart([], []);
     }
   }
 
@@ -356,49 +302,24 @@ function roiFromRelBox(faceBox, rel) {
 function drawOverlay(faceBox, faceScore, roiBoxes) {
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 
-  const drawScale = getOverlayDrawScale();
-  const faceLineWidth = 2 * drawScale;
-  const roiLineWidth = 2 * drawScale;
-  const faceFontSize = 18 * drawScale;
-  const roiFontSize = 14 * drawScale;
-  const textPadding = 4 * drawScale;
-
-  overlayCtx.lineJoin = "round";
-  overlayCtx.lineCap = "round";
-
   if (faceBox) {
-    // overlayCtx.strokeStyle = "#22c55e";
-    overlayCtx.strokeStyle = "#3b82f6";
-    overlayCtx.lineWidth = faceLineWidth;
+    overlayCtx.strokeStyle = "#22c55e";
+    overlayCtx.lineWidth = 3;
     overlayCtx.strokeRect(faceBox.originX, faceBox.originY, faceBox.width, faceBox.height);
-    // overlayCtx.fillStyle = "#22c55e";
-    overlayCtx.fillStyle = "#3b82f6";
-    overlayCtx.font = `bold ${faceFontSize}px sans-serif`;
+    overlayCtx.fillStyle = "#22c55e";
+    overlayCtx.font = "16px sans-serif";
     if (typeof faceScore === "number") {
-      overlayCtx.fillText(
-        `face ${faceScore.toFixed(2)}`,
-        faceBox.originX,
-        Math.max(faceFontSize, faceBox.originY - 6 * drawScale)
-      );
+      overlayCtx.fillText(`face ${faceScore.toFixed(2)}`, faceBox.originX, Math.max(18, faceBox.originY - 8));
     }
   }
 
   overlayCtx.strokeStyle = "#ef4444";
-  overlayCtx.lineWidth = roiLineWidth;
-  overlayCtx.font = `bold ${roiFontSize}px sans-serif`;
+  overlayCtx.lineWidth = 2;
   roiBoxes.forEach((box, index) => {
     overlayCtx.strokeRect(box.x, box.y, box.width, box.height);
     overlayCtx.fillStyle = "#ef4444";
-    overlayCtx.fillText(`${index + 1}`, box.x + textPadding, box.y + roiFontSize);
+    overlayCtx.fillText(`${index + 1}`, box.x + 4, box.y + 14);
   });
-}
-
-function getOverlayDrawScale() {
-  const cssWidth = overlay.clientWidth || overlay.width || 1;
-  const cssHeight = overlay.clientHeight || overlay.height || 1;
-  const scaleX = overlay.width / cssWidth;
-  const scaleY = overlay.height / cssHeight;
-  return Math.max(scaleX, scaleY, 0.1);
 }
 
 function extractMeanRgb(videoElement, roiBoxes) {
@@ -468,8 +389,7 @@ function updatePulseEstimation(nowSec) {
   const raw = normalize(detrend(resampled.x, Math.round(DEFAULT_RESAMPLE_FS * 1.5)));
   let filtered = bandpassBiquad(raw, DEFAULT_RESAMPLE_FS, getMinBpm() / 60, getMaxBpm() / 60);
   filtered = normalize(movingAverage(filtered, 7));
-  appendStableRppgSamples(resampled.t, raw, filtered);
-  updateRppgChart();
+  updateRppgChart(raw, filtered);
 
   const intervalSec = getBpmInterval();
   if (nowSec - appState.lastBpmUpdateAt < intervalSec) {
@@ -754,70 +674,13 @@ function updateRgbChart() {
   rgbChart.update("none");
 }
 
-function appendStableRppgSamples(t, raw, filtered) {
-  if (!t.length) return;
-
-  let startIndex = 0;
-  if (appState.lastRppgPlotTime != null) {
-    startIndex = t.findIndex((time) => time > appState.lastRppgPlotTime + 1e-6);
-    if (startIndex < 0) return;
-  }
-
-  for (let i = startIndex; i < t.length; i += 1) {
-    appState.rppgPlotRaw.push(raw[i]);
-    appState.rppgPlotFiltered.push(filtered[i]);
-    appState.lastRppgPlotTime = t[i];
-  }
-
-  const keep = getRppgDisplaySamples() * 2;
-  if (appState.rppgPlotRaw.length > keep) {
-    appState.rppgPlotRaw = appState.rppgPlotRaw.slice(-keep);
-    appState.rppgPlotFiltered = appState.rppgPlotFiltered.slice(-keep);
-  }
-}
-
-function updateRppgChart() {
+function updateRppgChart(raw, filtered) {
   const displayLen = getRppgDisplaySamples();
-  const rawSeries = toFixedFlowSeries(appState.rppgPlotRaw, displayLen);
-  const filteredSeries = toFixedFlowSeries(appState.rppgPlotFiltered, displayLen);
-
   rppgChart.data.labels = Array.from({ length: displayLen }, (_, i) => i + 1);
-  rppgChart.data.datasets[0].data = rawSeries;
-  rppgChart.data.datasets[1].data = filteredSeries;
-  updateRppgYAxis(rawSeries, filteredSeries);
+  rppgChart.data.datasets[0].data = toFixedFlowSeries(raw, displayLen);
+  rppgChart.data.datasets[1].data = toFixedFlowSeries(filtered, displayLen);
   applySeriesVisibility();
   rppgChart.update("none");
-}
-
-function updateRppgYAxis(...seriesList) {
-  const visibleValues = seriesList.flat().filter((v) => Number.isFinite(v));
-  if (visibleValues.length < 8) return;
-
-  let min = Math.min(...visibleValues);
-  let max = Math.max(...visibleValues);
-  if (max - min < 0.5) {
-    const center = (max + min) / 2;
-    min = center - 0.25;
-    max = center + 0.25;
-  }
-
-  const margin = (max - min) * 0.18;
-  const targetMin = min - margin;
-  const targetMax = max + margin;
-  const current = appState.rppgYAxis;
-  const growAlpha = 0.18;
-  const shrinkAlpha = 0.035;
-
-  current.min = smoothAxisLimit(current.min, targetMin, targetMin < current.min ? growAlpha : shrinkAlpha);
-  current.max = smoothAxisLimit(current.max, targetMax, targetMax > current.max ? growAlpha : shrinkAlpha);
-
-  rppgChart.options.scales.y.min = current.min;
-  rppgChart.options.scales.y.max = current.max;
-}
-
-function smoothAxisLimit(prev, next, alpha) {
-  if (!Number.isFinite(prev)) return next;
-  return prev + (next - prev) * alpha;
 }
 
 function toFixedFlowSeries(values, displayLen) {
@@ -832,47 +695,6 @@ function toFixedFlowSeries(values, displayLen) {
 
 function getRppgDisplaySamples() {
   return Math.max(64, Math.round(getWindowSec() * DEFAULT_RESAMPLE_FS), RPPG_DISPLAY_SAMPLES);
-}
-
-function setupCameraResolutionControl() {
-  populateCameraResolutionOptions();
-  cameraResolutionSelect?.addEventListener("change", async () => {
-    if (!appState.stream) return;
-    setStatus("解像度変更中...");
-    await applySelectedCameraResolution();
-  });
-}
-
-function populateCameraResolutionOptions() {
-  if (!cameraResolutionSelect) return;
-
-  const previous = cameraResolutionSelect.value || "max";
-  const capabilities = appState.cameraCapabilities || {};
-  const maxWidth = getCapabilityMax(capabilities.width);
-  const maxHeight = getCapabilityMax(capabilities.height);
-  const candidates = [];
-
-  if (maxWidth && maxHeight) {
-    candidates.push({ label: `Max available (${maxWidth} x ${maxHeight})`, value: "max" });
-  } else {
-    candidates.push({ label: "Max available", value: "max" });
-  }
-
-  for (const preset of CAMERA_RESOLUTION_PRESETS) {
-    if (maxWidth && preset.width > maxWidth) continue;
-    if (maxHeight && preset.height > maxHeight) continue;
-    candidates.push({ label: preset.label, value: `${preset.width}x${preset.height}` });
-  }
-
-  cameraResolutionSelect.innerHTML = "";
-  for (const item of candidates) {
-    const option = document.createElement("option");
-    option.value = item.value;
-    option.textContent = item.label;
-    cameraResolutionSelect.appendChild(option);
-  }
-
-  cameraResolutionSelect.value = candidates.some((item) => item.value === previous) ? previous : "max";
 }
 
 function setupSeriesVisibilityControls() {
@@ -909,7 +731,6 @@ function createChart(canvasId, datasets) {
         tension: 0.2,
         pointRadius: 0,
         borderWidth: 2,
-        spanGaps: false,
       })),
     },
     options: {
@@ -942,10 +763,8 @@ function updateResolutionLabel() {
   const maxWidth = getCapabilityMax(capabilities.width);
   const maxHeight = getCapabilityMax(capabilities.height);
   const maxText = maxWidth && maxHeight ? ` / max ${maxWidth} x ${maxHeight}` : "";
-  const selected = cameraResolutionSelect?.selectedOptions?.[0]?.textContent || "";
-  const selectedText = selected ? ` / selected ${selected}` : "";
 
-  resolutionValue.textContent = width && height ? `${width} x ${height}${fps}${maxText}${selectedText}` : "--";
+  resolutionValue.textContent = width && height ? `${width} x ${height}${fps}${maxText}` : "--";
 }
 
 function getWindowSec() {

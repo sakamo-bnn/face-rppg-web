@@ -356,49 +356,25 @@ function roiFromRelBox(faceBox, rel) {
 function drawOverlay(faceBox, faceScore, roiBoxes) {
   overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 
-  const drawScale = getOverlayDrawScale();
-  const faceLineWidth = 2 * drawScale;
-  const roiLineWidth = 2 * drawScale;
-  const faceFontSize = 18 * drawScale;
-  const roiFontSize = 14 * drawScale;
-  const textPadding = 4 * drawScale;
-
-  overlayCtx.lineJoin = "round";
-  overlayCtx.lineCap = "round";
-
   if (faceBox) {
-    // overlayCtx.strokeStyle = "#22c55e";
-    overlayCtx.strokeStyle = "#3b82f6";
-    overlayCtx.lineWidth = faceLineWidth;
+    overlayCtx.strokeStyle = "#22c55e";
+    overlayCtx.lineWidth = 6;
     overlayCtx.strokeRect(faceBox.originX, faceBox.originY, faceBox.width, faceBox.height);
-    // overlayCtx.fillStyle = "#22c55e";
-    overlayCtx.fillStyle = "#3b82f6";
-    overlayCtx.font = `bold ${faceFontSize}px sans-serif`;
+    overlayCtx.fillStyle = "#22c55e";
+    overlayCtx.font = "bold 28px sans-serif";
     if (typeof faceScore === "number") {
-      overlayCtx.fillText(
-        `face ${faceScore.toFixed(2)}`,
-        faceBox.originX,
-        Math.max(faceFontSize, faceBox.originY - 6 * drawScale)
-      );
+      overlayCtx.fillText(`face ${faceScore.toFixed(2)}`, faceBox.originX, Math.max(18, faceBox.originY - 8));
     }
   }
 
   overlayCtx.strokeStyle = "#ef4444";
-  overlayCtx.lineWidth = roiLineWidth;
-  overlayCtx.font = `bold ${roiFontSize}px sans-serif`;
+  overlayCtx.lineWidth = 4;
+  overlayCtx.font = "bold 22px sans-serif";
   roiBoxes.forEach((box, index) => {
     overlayCtx.strokeRect(box.x, box.y, box.width, box.height);
     overlayCtx.fillStyle = "#ef4444";
-    overlayCtx.fillText(`${index + 1}`, box.x + textPadding, box.y + roiFontSize);
+    overlayCtx.fillText(`${index + 1}`, box.x + 4, box.y + 14);
   });
-}
-
-function getOverlayDrawScale() {
-  const cssWidth = overlay.clientWidth || overlay.width || 1;
-  const cssHeight = overlay.clientHeight || overlay.height || 1;
-  const scaleX = overlay.width / cssWidth;
-  const scaleY = overlay.height / cssHeight;
-  return Math.max(scaleX, scaleY, 0.1);
 }
 
 function extractMeanRgb(videoElement, roiBoxes) {

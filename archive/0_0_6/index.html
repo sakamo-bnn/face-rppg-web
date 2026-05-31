@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Face rPPG v1.1</title>
+    <title>Face rPPG</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -13,11 +13,7 @@
     <main class="app-shell">
       <header class="app-header">
         <div class="header-copy">
-          <div class="title-row">
-            <h1>Face rPPG</h1>
-            <span class="version-badge">v1.1</span>
-          </div>
-          <p class="subtitle">Camera-based Remote Photoplethysmography</p>
+          <h1>Face rPPG</h1>
         </div>
         <button id="startButton" class="primary-button">計測開始</button>
       </header>
@@ -46,7 +42,7 @@
         <article class="status-card">
           <h2>Resolution</h2>
           <p id="resolutionValue" class="status-value small">--</p>
-          <p class="status-note">カメラ入力サイズ</p>
+          <p class="status-note">実入力サイズ / 最高対応サイズ</p>
         </article>
       </section>
 
@@ -112,12 +108,6 @@
           <h2>Parameters</h2>
         </div>
         <div class="settings-grid">
-          <label>
-            Camera Resolution
-            <select id="cameraResolutionSelect">
-              <option value="max" selected>Max available</option>
-            </select>
-          </label>
           <label>
             Window (sec)
             <input id="windowSecInput" type="number" min="5" max="20" step="1" value="10" />
