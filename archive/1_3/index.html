@@ -4,14 +4,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Face rPPG v1.6.1</title>
+    <title>Face rPPG (v1.3)</title>
     <link rel="icon" href="data:," />
     <link rel="stylesheet" href="./styles.css" />
   </head>
 
   <body>
-    <div id="permissionModal" class="permission-modal" role="dialog" aria-modal="true"
-      aria-labelledby="permissionTitle">
+    <div id="permissionModal" class="permission-modal" role="dialog" aria-modal="true" aria-labelledby="permissionTitle">
       <div class="permission-card">
         <h2 id="permissionTitle">Camera Permission</h2>
         <p>
@@ -27,7 +26,7 @@
       <header class="app-header">
         <div class="header-copy">
           <div class="title-line">
-            <h1>Face rPPG <span class="version-chip">v1.6.1</span></h1>
+            <h1>Face rPPG <span class="version-inline">(v1.3)</span></h1>
             <p class="subtitle">Camera-based Remote Photoplethysmography</p>
           </div>
         </div>
@@ -40,36 +39,26 @@
           <p class="status-note">推定心拍数</p>
         </article>
         <article class="status-card">
-          <h2>Quality</h2>
-          <p id="qualityValue" class="status-value">--</p>
-          <p class="status-note">ピーク強度 / スペクトル中央値</p>
-        </article>
-        <article class="status-card">
-          <h2>Face Area</h2>
-          <p id="faceAreaValue" class="status-value">--</p>
-          <p class="status-note">顔領域 / 入力画面</p>
-        </article>
-        <article class="status-card">
           <h2>FPS</h2>
           <p id="fpsValue" class="status-value">--</p>
           <p class="status-note">描画更新レート</p>
+        </article>
+        <article class="status-card">
+          <h2>Resolution</h2>
+          <p id="resolutionValue" class="status-value small">--</p>
+          <p class="status-note">カメラ入力サイズ</p>
+        </article>
+        <article class="status-card">
+          <h2>Quality</h2>
+          <p id="qualityValue" class="status-value">--</p>
+          <p class="status-note">ピーク強度 / スペクトル中央値</p>
         </article>
       </section>
 
       <section id="contentGrid" class="content-grid">
         <article class="panel video-panel">
-          <div class="panel-header chart-header">
+          <div class="panel-header">
             <h2>Camera</h2>
-            <div class="series-controls" aria-label="Camera overlay visibility">
-              <label class="series-toggle series-toggle-face">
-                <input id="showFaceBox" type="checkbox" checked />
-                Face box
-              </label>
-              <label class="series-toggle series-toggle-roi">
-                <input id="showRoiBoxes" type="checkbox" checked />
-                ROI
-              </label>
-            </div>
           </div>
           <div class="video-stage-wrap">
             <div class="video-stage">
@@ -77,11 +66,10 @@
               <canvas id="overlay"></canvas>
             </div>
           </div>
-          <!-- <p class="panel-note">顔全体と、額・左右頬・鼻横・あご周辺など複数 ROI を重ね描画します。</p> -->
+          <p class="panel-note">顔全体と、額・左右頬・鼻横・あご周辺など複数 ROI を重ね描画します。</p>
         </article>
 
-        <div id="columnResizer" class="column-resizer" role="separator" aria-orientation="vertical"
-          aria-label="Camera and chart width resize" tabindex="0"></div>
+        <div id="columnResizer" class="column-resizer" role="separator" aria-orientation="vertical" aria-label="Camera and chart width resize" tabindex="0"></div>
 
         <div class="charts-column">
           <article class="panel chart-panel">
@@ -129,8 +117,7 @@
       </section>
 
       <section class="panel settings-panel">
-        <div class="panel-header settings-toggle" id="settingsToggle" role="button" tabindex="0" aria-expanded="true"
-          aria-controls="settingsGrid">
+        <div class="panel-header settings-toggle" id="settingsToggle" role="button" tabindex="0" aria-expanded="true" aria-controls="settingsGrid">
           <h2>Parameters</h2>
           <span class="toggle-indicator" aria-hidden="true">▾</span>
         </div>

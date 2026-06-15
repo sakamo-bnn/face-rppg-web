@@ -6,8 +6,9 @@ const overlayCtx = overlay.getContext("2d");
 
 const bpmValue = document.getElementById("bpmValue");
 const qualityValue = document.getElementById("qualityValue");
-const fpsValue = document.getElementById("fpsValue");
 const faceAreaValue = document.getElementById("faceAreaValue");
+const snrValue = document.getElementById("snrValue");
+const fpsValue = document.getElementById("fpsValue");
 const statusValue = document.getElementById("statusValue");
 const permissionModal = document.getElementById("permissionModal");
 const permissionButton = document.getElementById("permissionButton");
@@ -44,6 +45,8 @@ const appState = {
   lastBpmUpdateAt: 0,
   lastBpm: null,
   lastQuality: 0,
+  lastSnr: null,
+  lastFaceArea: null,
   samples: [],
   offscreenCanvas: null,
   offscreenCtx: null,
@@ -116,12 +119,14 @@ function resetStateForRun() {
   appState.lastBpmUpdateAt = 0;
   appState.lastBpm = null;
   appState.lastQuality = 0;
+  appState.lastSnr = null;
+  appState.lastFaceArea = null;
   appState.samples = [];
   appState.rppgPlotRaw = [];
   appState.rppgPlotFiltered = [];
   appState.lastRppgPlotTime = null;
   appState.rppgYAxis = { min: -3, max: 3 };
-  updatePulseLabels(null, null);
+  updatePulseLabels(null, null, null);
   updateFaceAreaLabel(null);
   updateRgbChart();
   updateRppgChart([], []);
@@ -305,7 +310,7 @@ function processLoop(now) {
 
     const roiBoxes = getMultiRois(faceBox);
     drawOverlay(faceBox, faceScore, roiBoxes);
-    updateFaceAreaLabel(faceBox);
+    updateFaceAreaFromBox(faceBox);
 
     if (roiBoxes.length > 0) {
       const rgb = extractMeanRgb(video, roiBoxes);
@@ -315,8 +320,7 @@ function processLoop(now) {
       setStatus("計測中");
     } else {
       setStatus("顔が見つかりません");
-      updatePulseLabels(null, null);
-      updateFaceAreaLabel(null);
+      updatePulseLabels(null, null, null);
     }
   }
 
@@ -474,7 +478,7 @@ function pushRgbSample(t, rgb) {
 
 function updatePulseEstimation(nowSec) {
   if (appState.samples.length < 64) {
-    updatePulseLabels(appState.lastBpm, appState.lastQuality);
+    updatePulseLabels(appState.lastBpm, appState.lastQuality, appState.lastSnr);
     return;
   }
 
@@ -484,7 +488,7 @@ function updatePulseEstimation(nowSec) {
   const chromSig = extractChromSignal(rgbSeq);
   const resampled = resampleSignal(tSeq, chromSig, DEFAULT_RESAMPLE_FS);
   if (!resampled || resampled.x.length < 64) {
-    updatePulseLabels(appState.lastBpm, appState.lastQuality);
+    updatePulseLabels(appState.lastBpm, appState.lastQuality, appState.lastSnr);
     return;
   }
 
@@ -496,7 +500,7 @@ function updatePulseEstimation(nowSec) {
 
   const intervalSec = getBpmInterval();
   if (nowSec - appState.lastBpmUpdateAt < intervalSec) {
-    updatePulseLabels(appState.lastBpm, appState.lastQuality);
+    updatePulseLabels(appState.lastBpm, appState.lastQuality, appState.lastSnr);
     return;
   }
 
@@ -504,10 +508,11 @@ function updatePulseEstimation(nowSec) {
   if (estimate && estimate.quality >= QUALITY_THRESHOLD) {
     appState.lastBpm = smoothBpm(appState.lastBpm, estimate.bpm, 0.08);
     appState.lastQuality = estimate.quality;
+    appState.lastSnr = qualityToSnrDb(estimate.quality);
   }
 
   appState.lastBpmUpdateAt = nowSec;
-  updatePulseLabels(appState.lastBpm, appState.lastQuality);
+  updatePulseLabels(appState.lastBpm, appState.lastQuality, appState.lastSnr);
 }
 
 function extractChromSignal(rgbBuffer) {
@@ -759,25 +764,35 @@ function updateFps(now) {
 
   const fps = 1000 / dt;
   appState.fpsSmooth = appState.fpsSmooth == null ? fps : 0.9 * appState.fpsSmooth + 0.1 * fps;
-  fpsValue.textContent = appState.fpsSmooth.toFixed(1);
+  if (fpsValue) fpsValue.textContent = appState.fpsSmooth.toFixed(1);
 }
 
-function updateFaceAreaLabel(faceBox) {
-  if (!faceAreaValue) return;
+function updatePulseLabels(bpm, quality, snr) {
+  bpmValue.textContent = bpm == null ? "--" : bpm.toFixed(1);
+  qualityValue.textContent = quality == null ? "--" : quality.toFixed(2);
+  if (snrValue) snrValue.textContent = snr == null ? "--" : `${snr.toFixed(1)} dB`;
+}
+
+function qualityToSnrDb(quality) {
+  if (!Number.isFinite(quality) || quality <= 0) return null;
+  return 20 * Math.log10(quality);
+}
+
+function updateFaceAreaFromBox(faceBox) {
   if (!faceBox || !overlay.width || !overlay.height) {
-    faceAreaValue.textContent = "--";
+    appState.lastFaceArea = null;
+    updateFaceAreaLabel(null);
     return;
   }
 
-  const faceArea = Math.max(0, faceBox.width) * Math.max(0, faceBox.height);
-  const frameArea = overlay.width * overlay.height;
-  const percent = frameArea > 0 ? (faceArea / frameArea) * 100 : 0;
-  faceAreaValue.textContent = `${percent.toFixed(1)}%`;
+  const areaRatio = (faceBox.width * faceBox.height) / (overlay.width * overlay.height);
+  appState.lastFaceArea = areaRatio * 100;
+  updateFaceAreaLabel(appState.lastFaceArea);
 }
 
-function updatePulseLabels(bpm, quality) {
-  bpmValue.textContent = bpm == null ? "--" : bpm.toFixed(1);
-  qualityValue.textContent = quality == null ? "--" : quality.toFixed(2);
+function updateFaceAreaLabel(faceAreaPercent) {
+  if (!faceAreaValue) return;
+  faceAreaValue.textContent = faceAreaPercent == null ? "--" : `${faceAreaPercent.toFixed(1)}%`;
 }
 
 function updateRgbChart() {

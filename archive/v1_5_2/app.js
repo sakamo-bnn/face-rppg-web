@@ -7,7 +7,6 @@ const overlayCtx = overlay.getContext("2d");
 const bpmValue = document.getElementById("bpmValue");
 const qualityValue = document.getElementById("qualityValue");
 const fpsValue = document.getElementById("fpsValue");
-const faceAreaValue = document.getElementById("faceAreaValue");
 const statusValue = document.getElementById("statusValue");
 const permissionModal = document.getElementById("permissionModal");
 const permissionButton = document.getElementById("permissionButton");
@@ -122,7 +121,6 @@ function resetStateForRun() {
   appState.lastRppgPlotTime = null;
   appState.rppgYAxis = { min: -3, max: 3 };
   updatePulseLabels(null, null);
-  updateFaceAreaLabel(null);
   updateRgbChart();
   updateRppgChart([], []);
   updateResolutionLabel();
@@ -305,7 +303,6 @@ function processLoop(now) {
 
     const roiBoxes = getMultiRois(faceBox);
     drawOverlay(faceBox, faceScore, roiBoxes);
-    updateFaceAreaLabel(faceBox);
 
     if (roiBoxes.length > 0) {
       const rgb = extractMeanRgb(video, roiBoxes);
@@ -316,7 +313,6 @@ function processLoop(now) {
     } else {
       setStatus("顔が見つかりません");
       updatePulseLabels(null, null);
-      updateFaceAreaLabel(null);
     }
   }
 
@@ -760,19 +756,6 @@ function updateFps(now) {
   const fps = 1000 / dt;
   appState.fpsSmooth = appState.fpsSmooth == null ? fps : 0.9 * appState.fpsSmooth + 0.1 * fps;
   fpsValue.textContent = appState.fpsSmooth.toFixed(1);
-}
-
-function updateFaceAreaLabel(faceBox) {
-  if (!faceAreaValue) return;
-  if (!faceBox || !overlay.width || !overlay.height) {
-    faceAreaValue.textContent = "--";
-    return;
-  }
-
-  const faceArea = Math.max(0, faceBox.width) * Math.max(0, faceBox.height);
-  const frameArea = overlay.width * overlay.height;
-  const percent = frameArea > 0 ? (faceArea / frameArea) * 100 : 0;
-  faceAreaValue.textContent = `${percent.toFixed(1)}%`;
 }
 
 function updatePulseLabels(bpm, quality) {

@@ -7,7 +7,6 @@ const overlayCtx = overlay.getContext("2d");
 const bpmValue = document.getElementById("bpmValue");
 const qualityValue = document.getElementById("qualityValue");
 const fpsValue = document.getElementById("fpsValue");
-const faceAreaValue = document.getElementById("faceAreaValue");
 const statusValue = document.getElementById("statusValue");
 const permissionModal = document.getElementById("permissionModal");
 const permissionButton = document.getElementById("permissionButton");
@@ -28,8 +27,6 @@ const showRgbG = document.getElementById("showRgbG");
 const showRgbB = document.getElementById("showRgbB");
 const showRppgRaw = document.getElementById("showRppgRaw");
 const showRppgFiltered = document.getElementById("showRppgFiltered");
-const showFaceBox = document.getElementById("showFaceBox");
-const showRoiBoxes = document.getElementById("showRoiBoxes");
 
 const appState = {
   detector: null,
@@ -122,7 +119,6 @@ function resetStateForRun() {
   appState.lastRppgPlotTime = null;
   appState.rppgYAxis = { min: -3, max: 3 };
   updatePulseLabels(null, null);
-  updateFaceAreaLabel(null);
   updateRgbChart();
   updateRppgChart([], []);
   updateResolutionLabel();
@@ -252,7 +248,6 @@ function stopApp() {
 function syncCanvasSize() {
   overlay.width = video.videoWidth || 640;
   overlay.height = video.videoHeight || 480;
-  updateCameraAspectRatio();
   updateResolutionLabel();
 
   if (!appState.offscreenCanvas) {
@@ -261,13 +256,6 @@ function syncCanvasSize() {
   }
   appState.offscreenCanvas.width = overlay.width;
   appState.offscreenCanvas.height = overlay.height;
-}
-
-function updateCameraAspectRatio() {
-  const width = video.videoWidth || overlay.width || 0;
-  const height = video.videoHeight || overlay.height || 0;
-  if (!width || !height) return;
-  document.documentElement.style.setProperty("--camera-aspect", `${width} / ${height}`);
 }
 
 function processLoop(now) {
@@ -305,7 +293,6 @@ function processLoop(now) {
 
     const roiBoxes = getMultiRois(faceBox);
     drawOverlay(faceBox, faceScore, roiBoxes);
-    updateFaceAreaLabel(faceBox);
 
     if (roiBoxes.length > 0) {
       const rgb = extractMeanRgb(video, roiBoxes);
@@ -316,7 +303,6 @@ function processLoop(now) {
     } else {
       setStatus("顔が見つかりません");
       updatePulseLabels(null, null);
-      updateFaceAreaLabel(null);
     }
   }
 
@@ -377,43 +363,38 @@ function drawOverlay(faceBox, faceScore, roiBoxes) {
   const drawScale = getOverlayDrawScale();
   const faceLineWidth = 4 * drawScale;
   const roiLineWidth = 3 * drawScale;
-  const faceFontSize = Math.max(24 * drawScale, Math.min(34 * drawScale, faceBox ? faceBox.height * 0.075 : 26 * drawScale));
-  const roiFontSize = Math.max(18 * drawScale, Math.min(26 * drawScale, faceBox ? faceBox.height * 0.055 : 20 * drawScale));
+  const faceFontSize = 26 * drawScale;
+  const roiFontSize = 20 * drawScale;
   const textPadding = 4 * drawScale;
-  const shouldShowFaceBox = showFaceBox ? showFaceBox.checked : true;
-  const shouldShowRoiBoxes = showRoiBoxes ? showRoiBoxes.checked : true;
 
   overlayCtx.lineJoin = "round";
   overlayCtx.lineCap = "round";
 
-  if (faceBox && shouldShowFaceBox) {
+  if (faceBox) {
+    // overlayCtx.strokeStyle = "#22c55e";
     overlayCtx.strokeStyle = "#3b82f6";
     overlayCtx.lineWidth = faceLineWidth;
     overlayCtx.strokeRect(faceBox.originX, faceBox.originY, faceBox.width, faceBox.height);
+    // overlayCtx.fillStyle = "#22c55e";
     overlayCtx.fillStyle = "#3b82f6";
-    overlayCtx.font = `700 ${faceFontSize}px Arial, Helvetica, sans-serif`;
-    overlayCtx.textBaseline = "bottom";
-    overlayCtx.textAlign = "left";
-    const label = typeof faceScore === "number" ? `Face ${faceScore.toFixed(2)}` : "Face";
-    overlayCtx.fillText(
-      label,
-      faceBox.originX,
-      Math.max(faceFontSize, faceBox.originY - 6 * drawScale)
-    );
+    overlayCtx.font = `bold ${faceFontSize}px sans-serif`;
+    if (typeof faceScore === "number") {
+      overlayCtx.fillText(
+        `face ${faceScore.toFixed(2)}`,
+        faceBox.originX,
+        Math.max(faceFontSize, faceBox.originY - 6 * drawScale)
+      );
+    }
   }
 
-  if (shouldShowRoiBoxes) {
-    overlayCtx.strokeStyle = "#ef4444";
-    overlayCtx.lineWidth = roiLineWidth;
-    overlayCtx.font = `700 ${roiFontSize}px Arial, Helvetica, sans-serif`;
-    overlayCtx.textBaseline = "top";
-    overlayCtx.textAlign = "left";
-    roiBoxes.forEach((box, index) => {
-      overlayCtx.strokeRect(box.x, box.y, box.width, box.height);
-      overlayCtx.fillStyle = "#ef4444";
-      overlayCtx.fillText(`${index + 1}`, box.x + textPadding, box.y + roiFontSize);
-    });
-  }
+  overlayCtx.strokeStyle = "#ef4444";
+  overlayCtx.lineWidth = roiLineWidth;
+  overlayCtx.font = `bold ${roiFontSize}px sans-serif`;
+  roiBoxes.forEach((box, index) => {
+    overlayCtx.strokeRect(box.x, box.y, box.width, box.height);
+    overlayCtx.fillStyle = "#ef4444";
+    overlayCtx.fillText(`${index + 1}`, box.x + textPadding, box.y + roiFontSize);
+  });
 }
 
 function getOverlayDrawScale() {
@@ -762,19 +743,6 @@ function updateFps(now) {
   fpsValue.textContent = appState.fpsSmooth.toFixed(1);
 }
 
-function updateFaceAreaLabel(faceBox) {
-  if (!faceAreaValue) return;
-  if (!faceBox || !overlay.width || !overlay.height) {
-    faceAreaValue.textContent = "--";
-    return;
-  }
-
-  const faceArea = Math.max(0, faceBox.width) * Math.max(0, faceBox.height);
-  const frameArea = overlay.width * overlay.height;
-  const percent = frameArea > 0 ? (faceArea / frameArea) * 100 : 0;
-  faceAreaValue.textContent = `${percent.toFixed(1)}%`;
-}
-
 function updatePulseLabels(bpm, quality) {
   bpmValue.textContent = bpm == null ? "--" : bpm.toFixed(1);
   qualityValue.textContent = quality == null ? "--" : quality.toFixed(2);
@@ -983,7 +951,7 @@ function populateCameraResolutionOptions() {
 }
 
 function setupSeriesVisibilityControls() {
-  [showRgbR, showRgbG, showRgbB, showRppgRaw, showRppgFiltered, showFaceBox, showRoiBoxes]
+  [showRgbR, showRgbG, showRgbB, showRppgRaw, showRppgFiltered]
     .filter(Boolean)
     .forEach((checkbox) => {
       checkbox.addEventListener("change", () => {
@@ -1043,8 +1011,16 @@ function updateResolutionLabel() {
   const settings = track?.getSettings?.() || {};
   const width = settings.width || video.videoWidth || overlay.width || 0;
   const height = settings.height || video.videoHeight || overlay.height || 0;
+  const fps = settings.frameRate ? ` / ${Math.round(settings.frameRate)}fps` : "";
 
-  resolutionValue.textContent = width && height ? `${width} x ${height}` : "--";
+  const capabilities = appState.cameraCapabilities || track?.getCapabilities?.() || {};
+  const maxWidth = getCapabilityMax(capabilities.width);
+  const maxHeight = getCapabilityMax(capabilities.height);
+  const maxText = maxWidth && maxHeight ? ` / max ${maxWidth} x ${maxHeight}` : "";
+  const selected = cameraResolutionSelect?.selectedOptions?.[0]?.textContent || "";
+  const selectedText = selected ? ` / selected ${selected}` : "";
+
+  resolutionValue.textContent = width && height ? `${width} x ${height}${fps}${maxText}${selectedText}` : "--";
 }
 
 function getWindowSec() {
