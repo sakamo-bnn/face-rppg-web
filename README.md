@@ -1,30 +1,31 @@
 # Web Heart Rate Monitor
+本リポジトリでは、カメラ映像の顔から心拍を計測するWebアプリを開発しています。
+
+https://sakamo-bnn.github.io/face-rppg-web/
 
 ## 概要
-添付された `web-heartrate.py` の構成を、ブラウザで動作する Web アプリへ置き換えた実装です。
+一般的な心拍の測定はPPGセンサを用いており、測定機器との接触を要します。従って、不特定多数の人が使用する環境では、他者が装着した機器を身につけることへの不快感や、衛生面への懸念が生じます。
 
-- カメラ取得: `getUserMedia`
-- 顔検出: MediaPipe Face Detector
-- グラフ描画: Chart.js
-- 信号処理: 純粋な JavaScript 実装（CHROM, 補間, FFT ベース BPM 推定）
+本アプリでは、カメラ映像から、拍動に伴う顔色の微細な変動を用いて心拍を計測します。これにより、専用のセンサを装着することなく、非接触かつ手軽に心拍をリアルタイムに測定できます。 
 
-## ファイル構成
-- `index.html` UI 本体
-- `styles.css` 見た目
-- `app.js` カメラ制御・顔検出・ROI 抽出・rPPG 推定・グラフ更新
+## 仕組み
+<iframe
+  src="./docs/face-rppg-web（A4縦）.pdf"
+  width="100%"
+  height="700px">
+</iframe>
 
-## 起動方法
-ローカルでそのまま `index.html` を開くより、簡易 HTTP サーバを使う方が安定します。
 
-### Python を使う場合
+[![PDFプレビュー](./docs/face-rppg-web（A4縦）.pdf)](./docs/face-rppg-web（A4縦）.pdf)
+
+## ローカルにおける起動方法
+ローカルで`index.html`をそのまま開くのではなく、サーバを立てる方が安定して動作します。
+
+VSCodeのLive Serverの利用を推奨しますが、Pythonを使って簡易サーバを立てることも可能です。
+
 ```bash
 cd web_heartrate_app
 python -m http.server 8000
 ```
 
 その後ブラウザで `http://localhost:8000` を開いてください。
-
-## 注意
-- 元の Python 実装は OpenCV DNN の Caffe 顔検出器、SciPy の Butterworth + filtfilt、PyQtGraph を使っていました。
-- この Web 版では、顔検出は MediaPipe、フィルタは JavaScript 側の軽量近似実装へ置き換えています。
-- そのため BPM の数値は元アプリと完全一致ではありませんが、構成と流れは対応しています。
