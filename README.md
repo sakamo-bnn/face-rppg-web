@@ -9,14 +9,9 @@ https://sakamo-bnn.github.io/face-rppg-web/
 本アプリでは、カメラ映像から、拍動に伴う顔色の微細な変動を用いて心拍を計測します。これにより、専用のセンサを装着することなく、非接触かつ手軽に心拍をリアルタイムに測定できます。 
 
 ## 仕組み
-<iframe
-  src="./docs/face-rppg-web（A4縦）.pdf"
-  width="100%"
-  height="700px">
-</iframe>
+![./docs/face-rppg-web（A4縦）.png](./docs/face-rppg-web（A4縦）.png)
 
 
-[![PDFプレビュー](./docs/face-rppg-web（A4縦）.pdf)](./docs/face-rppg-web（A4縦）.pdf)
 
 ## ローカルにおける起動方法
 ローカルで`index.html`をそのまま開くのではなく、サーバを立てる方が安定して動作します。
